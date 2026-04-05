@@ -55,17 +55,16 @@ fi
 # 5) CREATE THE LXC
 # ---------------------------------------------------
 echo "Creating container..."
-pct create $CTID $TEMPLATE \
-    --hostname $HOSTNAME \
-    --cores $CORES \
-    --memory $MEMORY \
-    --net0 name=eth0,bridge=vmbr0,ip=dhcp \
-    --unprivileged $UNPRIV \
-    --storage $STORAGE \
-    --rootfs $STORAGE:${DISK} \
-    --features nesting=1 \
-    --ostype debian \
-    --timezone host
+pct create $CTID "$STORAGE:vztmpl/$TEMPLATE" \
+    -hostname $HOSTNAME \
+    -memory $MEMORY \
+    -cores $CORES \
+    -rootfs $STORAGE:${DISK} \
+    -net0 name=eth0,bridge=vmbr0,ip=dhcp \
+    -unprivileged $UNPRIV \
+    -features nesting=1 \
+    -ostype debian \
+    -timezone host
 
 pct start $CTID
 sleep 5
