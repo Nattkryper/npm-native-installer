@@ -33,48 +33,32 @@ CTID=$(pvesh get /cluster/nextid)
 echo "✅ Next available CTID: $CTID"
 
 # ---------------------------------------------------
-# FIND / DOWNLOAD TEMPLATE (PVE 8 & 9 compatible)
+# FIND / DOWNLOAD DEBIAN 12 TEMPLATE (safe logic)
 # ---------------------------------------------------
 echo "Checking for Debian 12 templates..."
 
-# Extract correct filename (column 3 normally, fallback to 2)
-RAW_TEMPLATE_LINE=$(pveam list $STORAGE | grep -m1 "debian-12-standard" || true)
+# Try column 3 (most common)
+TEMPLATE=$(pveam list "$STORAGE" | awk '/debian-12-standard/ {print $3; exit}')
 
-if [ -n "$RAW_TEMPLATE_LINE" ]; then
-    # Try filename in $3
-    TEMPLATE=$(echo "$RAW_TEMPLATE_LINE" | awk '{print $3}')
-    # If $3 is empty or looks like a size, try $2
-    if [[ -z "$TEMPLATE" || "$TEMPLATE" =~ MB$ || "$TEMPLATE" =~ GB$ ]]; then
-        TEMPLATE=$(echo "$RAW_TEMPLATE_LINE" | awk '{print $2}')
-    fi
-else
-    TEMPLATE=""
+# If empty OR not a tar file → try column 2
+if [[ -z "$TEMPLATE" || "$TEMPLATE" != *.tar.* ]]; then
+    TEMPLATE=$(pveam list "$STORAGE" | awk '/debian-12-standard/ {print $2; exit}')
 fi
 
-# If STILL empty, must download it
-if [ -z "$TEMPLATE" ] || [[ "$TEMPLATE" != *.tar.* ]]; then
-    echo "⏳ No Debian 12 template found — downloading latest..."
+# If still empty → download latest
+if [[ -z "$TEMPLATE" || "$TEMPLATE" != *.tar.* ]]; then
+    echo "⏳ No Debian 12 template found — downloading..."
     pveam update >/dev/null
     TEMPLATE=$(pveam available | awk '/debian-12-standard/ {print $2; exit}')
-    pveam download $STORAGE $TEMPLATE
+    pveam download "$STORAGE" "$TEMPLATE"
 fi
 
-echo "✅ Template found: $TEMPLATE"
+echo "✅ Template filename: $TEMPLATE"
 
 # ---------------------------------------------------
-# CORRECT TEMPLATE PATH FOR pct (avoid double prefixes)
+# FINAL TEMPLATE PATH (NO PREFIX CLEANING!)
 # ---------------------------------------------------
-# pveam list prints:   local    vztmpl    debian-12...
-# pct create needs:    local:vztmpl/debian-12...
-
-# If TEMPLATE already includes 'local:' strip it
-CLEAN_TEMPLATE="$TEMPLATE"
-CLEAN_TEMPLATE="${CLEAN_TEMPLATE#local:}"      # remove leading local:
-CLEAN_TEMPLATE="${CLEAN_TEMPLATE#vztmpl/}"     # remove leading vztmpl/
-
-# Final correct template path:
-FINAL_TEMPLATE="${STORAGE}:vztmpl/${CLEAN_TEMPLATE}"
-
+FINAL_TEMPLATE="${STORAGE}:vztmpl/${TEMPLATE}"
 echo "✅ Final template path: $FINAL_TEMPLATE"
 
 # ---------------------------------------------------
@@ -83,12 +67,12 @@ echo "✅ Final template path: $FINAL_TEMPLATE"
 echo "🚀 Creating container..."
 
 pct create $CTID "$FINAL_TEMPLATE" \
-    -hostname $HOSTNAME \
-    -cores $CORES \
-    -memory $MEMORY \
-    -rootfs $STORAGE:${DISK} \
+    -hostname "$HOSTNAME" \
+    -cores "$CORES" \
+    -memory "$MEMORY" \
+    -rootfs "$STORAGE:${DISK}" \
     -net0 name=eth0,bridge=vmbr0,ip=dhcp \
-    -unprivileged $UNPRIV \
+    -unprivileged "$UNPRIV" \
     -features nesting=1,keyctl=1 \
     -ostype debian \
     -timezone host
