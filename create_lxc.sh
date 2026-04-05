@@ -30,7 +30,7 @@ TEMPLATE=$(pveam list $STORAGE | awk '/debian-12-standard/ {print $3; exit}')
 if [ -z "$TEMPLATE" ]; then
     echo "⏳ No Debian 12 template found — downloading..."
     pveam update >/dev/null
-    LATEST=$(pveam available | awk '/debian-12-standard/ {print $2; exit}')
+    LATEST=$(pveam available | awk '/debian-12-standard/ {
     pveam download $STORAGE $LATEST
     TEMPLATE=$LATEST
 fi
