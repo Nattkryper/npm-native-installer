@@ -8,7 +8,7 @@ echo "=== Nginx Proxy Manager LXC Creator ==="
 # ---------------------------------------------------
 echo "Detecting Proxmox storage for LXC..."
 
-STORAGE=$(pvesm status | awk '/rootdir/ {print $1; exit}')
+STORAGE="local"
 
 if [ -z "$STORAGE" ]; then
     echo "ERROR: No storage pool found that supports 'rootdir'!"
