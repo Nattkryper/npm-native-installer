@@ -1,32 +1,22 @@
 #!/usr/bin/env bash
 set -e
 
-echo "=== Nginx Proxy Manager LXC Creator ==="
+echo "=== Nginx Proxy Manager LXC Creator (PVE 9.1 Compatible) ==="
 
 # ---------------------------------------------------
-# 1) AUTO-DETECT STORAGE THAT SUPPORTS ROOTDIR
+# STORAGE (you said your storage is: local)
 # ---------------------------------------------------
-echo "Detecting Proxmox storage for LXC..."
-
 STORAGE="local"
-
-if [ -z "$STORAGE" ]; then
-    echo "ERROR: No storage pool found that supports 'rootdir'!"
-    echo "Enable 'Container' content in Datacenter → Storage."
-    exit 1
-fi
-
-echo "✅ Storage detected: $STORAGE"
+echo "✅ Using storage: $STORAGE"
 
 # ---------------------------------------------------
-# 2) SETTINGS
+# SETTINGS
 # ---------------------------------------------------
 HOSTNAME="nginxproxymanager"
 MEMORY="2048"
 CORES="2"
 DISK="16"
 UNPRIV="1"
-TEMPLATE="local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst"
 REPO="https://raw.githubusercontent.com/Nattkryper/npm-native-installer/main"
 
 echo "Hostname: $HOSTNAME"
@@ -37,32 +27,41 @@ echo "Unprivileged: Yes"
 echo "---------------------------------------"
 
 # ---------------------------------------------------
-# 3) GET NEXT FREE CTID
+# NEXT FREE CTID
 # ---------------------------------------------------
 CTID=$(pvesh get /cluster/nextid)
-echo "Using next available CTID: $CTID"
+echo "✅ Next available CTID: $CTID"
 
 # ---------------------------------------------------
-# 4) ENSURE DEBIAN TEMPLATE EXISTS
+# FIND / DOWNLOAD DEBIAN 12 TEMPLATE
 # ---------------------------------------------------
-if ! pct templates | grep -q "debian-12-standard"; then
-    echo "Downloading Debian 12 template..."
+echo "Checking for Debian 12 templates..."
+
+TEMPLATE=$(pveam list $STORAGE | awk '/debian-12-standard/ {print $2; exit}')
+
+if [ -z "$TEMPLATE" ]; then
+    echo "⏳ No Debian 12 template found — downloading..."
     pveam update >/dev/null
-    pveam download local debian-12-standard_12.2-1_amd64.tar.zst
+    LATEST=$(pveam available | awk '/debian-12-standard/ {print $2; exit}')
+    pveam download $STORAGE $LATEST
+    TEMPLATE=$LATEST
 fi
 
+echo "✅ Template found: $TEMPLATE"
+
 # ---------------------------------------------------
-# 5) CREATE THE LXC
+# CREATE LXC (PVE 9 syntax)
 # ---------------------------------------------------
-echo "Creating container..."
+echo "🚀 Creating container..."
+
 pct create $CTID "$STORAGE:vztmpl/$TEMPLATE" \
     -hostname $HOSTNAME \
-    -memory $MEMORY \
     -cores $CORES \
+    -memory $MEMORY \
     -rootfs $STORAGE:${DISK} \
     -net0 name=eth0,bridge=vmbr0,ip=dhcp \
     -unprivileged $UNPRIV \
-    -features nesting=1 \
+    -features nesting=1,keyctl=1 \
     -ostype debian \
     -timezone host
 
@@ -70,22 +69,23 @@ pct start $CTID
 sleep 5
 
 # ---------------------------------------------------
-# 6) INJECT AND RUN INSTALLER
+# INJECT INSTALLER
 # ---------------------------------------------------
 pct exec $CTID -- sh -c "apt update && apt install -y curl"
 pct exec $CTID -- sh -c "curl -fsSL $REPO/install.sh -o /root/install.sh && chmod +x /root/install.sh"
 
-echo "Running installer inside LXC..."
+# ---------------------------------------------------
+# RUN INSTALLER
+# ---------------------------------------------------
 pct exec $CTID -- bash /root/install.sh
 
-# ---------------------------------------------------
-# 7) PRINT FINAL INFO
-# ---------------------------------------------------
 IP=$(pct exec $CTID -- hostname -I | awk '{print $1}')
 
+echo ""
 echo "========================================="
 echo "✅ LXC created and NPM installed!"
 echo "➡ Container ID: $CTID"
 echo "➡ Access URL: http://$IP:81"
 echo "➡ Login: admin@example.com / changeme"
 echo "========================================="
+``
