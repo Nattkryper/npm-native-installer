@@ -25,7 +25,7 @@ echo "✅ Next available CTID: $CTID"
 
 echo "Checking for Debian 12 templates..."
 
-TEMPLATE=$(pveam list $STORAGE | awk '/debian-12-standard/ {print $2; exit}')
+TEMPLATE=$(pveam list $STORAGE | awk '/debian-12-standard/ {print $3; exit}')
 
 if [ -z "$TEMPLATE" ]; then
     echo "⏳ No Debian 12 template found — downloading..."
