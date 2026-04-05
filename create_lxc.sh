@@ -3,15 +3,9 @@ set -e
 
 echo "=== Nginx Proxy Manager LXC Creator (PVE 9.1 Compatible) ==="
 
-# ---------------------------------------------------
-# STORAGE (you said your storage is: local)
-# ---------------------------------------------------
 STORAGE="local"
 echo "✅ Using storage: $STORAGE"
 
-# ---------------------------------------------------
-# SETTINGS
-# ---------------------------------------------------
 HOSTNAME="nginxproxymanager"
 MEMORY="2048"
 CORES="2"
@@ -26,15 +20,9 @@ echo "Disk: ${DISK}GB"
 echo "Unprivileged: Yes"
 echo "---------------------------------------"
 
-# ---------------------------------------------------
-# NEXT FREE CTID
-# ---------------------------------------------------
 CTID=$(pvesh get /cluster/nextid)
 echo "✅ Next available CTID: $CTID"
 
-# ---------------------------------------------------
-# FIND / DOWNLOAD DEBIAN 12 TEMPLATE
-# ---------------------------------------------------
 echo "Checking for Debian 12 templates..."
 
 TEMPLATE=$(pveam list $STORAGE | awk '/debian-12-standard/ {print $2; exit}')
@@ -49,9 +37,6 @@ fi
 
 echo "✅ Template found: $TEMPLATE"
 
-# ---------------------------------------------------
-# CREATE LXC (PVE 9 syntax)
-# ---------------------------------------------------
 echo "🚀 Creating container..."
 
 pct create $CTID "$STORAGE:vztmpl/$TEMPLATE" \
@@ -68,15 +53,9 @@ pct create $CTID "$STORAGE:vztmpl/$TEMPLATE" \
 pct start $CTID
 sleep 5
 
-# ---------------------------------------------------
-# INJECT INSTALLER
-# ---------------------------------------------------
 pct exec $CTID -- sh -c "apt update && apt install -y curl"
 pct exec $CTID -- sh -c "curl -fsSL $REPO/install.sh -o /root/install.sh && chmod +x /root/install.sh"
 
-# ---------------------------------------------------
-# RUN INSTALLER
-# ---------------------------------------------------
 pct exec $CTID -- bash /root/install.sh
 
 IP=$(pct exec $CTID -- hostname -I | awk '{print $1}')
@@ -88,4 +67,3 @@ echo "➡ Container ID: $CTID"
 echo "➡ Access URL: http://$IP:81"
 echo "➡ Login: admin@example.com / changeme"
 echo "========================================="
-``
